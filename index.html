@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Geometry Dash — Web Edition</title>
+<meta name="description" content="A browser Geometry Dash clone with all 8 gamemodes and physics matching the real game: 240 TPS, 30-unit blocks, documented jump velocities and orb strengths." />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0f2e'/><rect x='8' y='8' width='16' height='16' rx='3' fill='%2338e8ff'/></svg>" />
+</head>
+<body>
+<div id="app">
+  <canvas id="game" width="960" height="540"></canvas>
+
+  <!-- HUD -->
+  <div id="hud" class="hidden">
+    <div class="hud-top">
+      <div class="hud-left">
+        <span id="mode-badge">CUBE</span>
+        <span id="speed-badge">1x</span>
+        <span id="practice-tag" class="hidden">PRACTICE</span>
+        <span id="level-title">LEVEL</span>
+      </div>
+      <div class="hud-right">
+        <span id="attempts">Attempt 1</span>
+        <button class="icon-btn" id="pause-btn" title="Pause (Esc)">II</button>
+      </div>
+    </div>
+    <div class="hud-bottom">
+      <div class="progress"><div id="progress-fill"></div></div>
+      <span id="progress-pct">0%</span>
+    </div>
+    <div id="sandbox-hint" class="hidden">Press 1–8 to switch gamemode · hold to move</div>
+  </div>
+
+  <!-- Menu -->
+  <div id="menu" class="screen">
+    <div class="menu-inner">
+      <header class="brand">
+        <div class="logo">
+          <span class="logo-cube"></span>
+          <h1>GEOMETRY<span>DASH</span></h1>
+        </div>
+        <p class="tagline">All 8 gamemodes · real physics · 240 ticks per second</p>
+        <p class="lede">Jump the spikes. Ride the portals. The whole game is one rhythm.</p>
+      </header>
+      <div id="level-grid" class="level-grid"></div>
+      <footer class="menu-foot">
+        <div class="foot-btns">
+          <button class="btn ghost" id="practice-toggle">Practice: off</button>
+          <span id="best-list" class="best-list"></span>
+        </div>
+        <p class="keys">
+          <b>Space</b> / click to jump &nbsp;·&nbsp; <b>Esc</b> pause &nbsp;·&nbsp; <b>R</b> restart &nbsp;·&nbsp;
+          <b>H</b> hitboxes &nbsp;·&nbsp; <b>M</b> music
+        </p>
+      </footer>
+    </div>
+  </div>
+
+  <!-- Pause -->
+  <div id="pause" class="screen hidden">
+    <div class="panel">
+      <h2>Paused</h2>
+      <div class="panel-btns">
+        <button class="btn primary" data-act="resume">Resume</button>
+        <button class="btn ghost" data-act="restart">Restart</button>
+        <button class="btn ghost" data-act="hitbox">Show hitboxes</button>
+        <button class="btn ghost on" data-act="music">Music: on</button>
+        <button class="btn ghost on" data-act="sfx">SFX: on</button>
+        <button class="btn ghost" data-act="menu">Level select</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Complete -->
+  <div id="complete" class="screen hidden">
+    <div class="panel win">
+      <h2 id="complete-title">Complete!</h2>
+      <p id="complete-stats"></p>
+      <div class="panel-btns">
+        <button class="btn primary" data-act="next">Next level</button>
+        <button class="btn ghost" data-act="retry">Replay</button>
+        <button class="btn ghost" data-act="menu">Level select</button>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
