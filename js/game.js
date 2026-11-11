@@ -45,6 +45,133 @@ export class Game {
     this.time = 0;
     this.shake = 0;
     this.trailTick = 0;
+
+    // Group transforms and triggers (editor levels). Base rects are captured
+    // once so a restart replays the authored layout exactly.
+    this.groups = new Map();
+    this.triggers = [];
+    this.anims = [];
+    this.coins = 0;
+    this.coinsTotal = 0;
+    for (const o of this.level.objects) {
+      if (o.bx0 === undefined) {
+        o.bx0 = o.x0; o.by0 = o.y0; o.bx1 = o.x1; o.by1 = o.y1;
+        o.bhz = o.hz ? { ...o.hz } : null;
+      }
+      o.x0 = o.bx0; o.y0 = o.by0; o.x1 = o.bx1; o.y1 = o.by1;
+      if (o.bhz) o.hz = { ...o.bhz };
+      o.dx = 0; o.dy = 0; o.hidden = false;
+      if (o.t === 'coin') { o.taken = false; this.coinsTotal++; }
+      if (o.t === 'trigger') { o.fired = false; this.triggers.push(o); }
+      if (o.grp) {
+        if (!this.groups.has(o.grp)) this.groups.set(o.grp, []);
+        this.groups.get(o.grp).push(o);
+      }
+    }
+    this.needsReindex = this.triggers.some((t) => t.tt === 'move');
+  }
+
+  // ---------------------------------------------------------------------
+  // Trigger runtime. Move/toggle/spawn/stop are simulated; the decorative
+  // ones are stored so the editor round-trips them.
+  // ---------------------------------------------------------------------
+  updateTriggers() {
+    const p = this.p;
+    const h = this.solidHalf;
+
+    for (const t of this.triggers) {
+      if (t.fired) continue;
+      if (p.x + h > t.x0 && p.x - h < t.x1 && p.y + h > t.y0 && p.y - h < t.y1) {
+        t.fired = true;
+        this.fireTrigger(t);
+      }
+    }
+
+    if (this.anims.length) {
+      for (let i = this.anims.length - 1; i >= 0; i--) {
+        const a = this.anims[i];
+        a.t += C.DT;
+        const k = Math.min(1, a.t / a.dur);
+        const v = a.from + (a.to - a.from) * (a.ease ? k * k * (3 - 2 * k) : k);
+        a.apply(v);
+        if (k >= 1) this.anims.splice(i, 1);
+      }
+      this.syncGroups();
+    }
+  }
+
+  fireTrigger(t) {
+    const target = (t.p && t.p.target) || 0;
+    const members = this.groups.get(target) || [];
+    if (t.tt === 'toggle') {
+      for (const o of members) {
+        o.hidden = !o.hidden;
+        if (o.hidden) { o.x0 = -1e6; o.x1 = -1e6; o.y0 = -1e6; o.y1 = -1e6; if (o.hz) { o.hz = { x0: -1e6, x1: -1e6, y0: -1e6, y1: -1e6 }; } }
+        else this.resetObject(o);
+      }
+      this.syncGroups();
+      this.sfx('portal');
+    } else if (t.tt === 'move') {
+      const p = t.p || {};
+      const from = { dx: members[0] ? members[0].dx : 0, dy: members[0] ? members[0].dy : 0 };
+      const to = { dx: from.dx + (p.dx || 0) * C.BLOCK, dy: from.dy + (p.dy || 0) * C.BLOCK };
+      const dur = Math.max(0.05, p.dur || 1);
+      const list = [];
+      for (const o of members) list.push(o);
+      this.anims.push({
+        t: 0, dur, from: 0, to: 1, ease: true,
+        apply: (v) => {
+          for (const o of list) {
+            if (o.hidden) continue;
+            o.dx = from.dx + (to.dx - from.dx) * v;
+            o.dy = from.dy + (to.dy - from.dy) * v;
+          }
+        },
+      });
+      this.needsReindex = true;
+    } else if (t.tt === 'alpha') {
+      // no per-object alpha in the renderer yet; stored for round-tripping
+    } else if (t.tt === 'spawn') {
+      for (const other of this.triggers) {
+        if (other !== t && other.grp === target && !other.fired) { other.fired = true; this.fireTrigger(other); }
+      }
+    } else if (t.tt === 'stop') {
+      this.anims = this.anims.filter((a) => !members.includes(a.owner));
+    }
+  }
+
+  resetObject(o) {
+    o.x0 = o.bx0; o.y0 = o.by0; o.x1 = o.bx1; o.y1 = o.by1;
+    if (o.bhz) o.hz = { ...o.bhz };
+  }
+
+  syncGroups() {
+    for (const o of this.level.objects) {
+      if (o.hidden) continue;
+      o.x0 = o.bx0 + o.dx;
+      o.x1 = o.bx1 + o.dx;
+      o.y0 = o.by0 + o.dy;
+      o.y1 = o.by1 + o.dy;
+      if (o.bhz) {
+        o.hz.x0 = o.bhz.x0 + o.dx; o.hz.x1 = o.bhz.x1 + o.dx;
+        o.hz.y0 = o.bhz.y0 + o.dy; o.hz.y1 = o.bhz.y1 + o.dy;
+      }
+    }
+    if (this.needsReindex) this.reindex();
+  }
+
+  reindex() {
+    const cols = this.level.columns;
+    cols.clear();
+    for (const o of this.level.objects) {
+      if (o.hidden) continue;
+      const c0 = Math.floor(o.x0 / C.BLOCK) - 1;
+      const c1 = Math.floor(o.x1 / C.BLOCK) + 1;
+      for (let c = c0; c <= c1; c++) {
+        if (!cols.has(c)) cols.set(c, []);
+        cols.get(c).push(o);
+      }
+    }
   }
 
   restart() {
@@ -105,6 +232,7 @@ export class Game {
     p.x += C.SPEEDS[p.speed].units * dt;
 
     this.applyObjects(press, click);
+    if (this.triggers.length || this.anims.length) this.updateTriggers();
 
     const info = C.MODE_INFO[p.mode];
     const sp = C.SPEEDS[p.speed];
@@ -245,6 +373,13 @@ export class Game {
       if (o.t === 'portal') {
         if (p.x + h > o.x0 && p.x - h < o.x1 && p.y + h > o.y0 && p.y - h < o.y1) {
           this.applyPortal(o);
+        }
+      } else if (o.t === 'coin') {
+        if (!o.taken && Math.abs(p.x - o.cx) < 22 + h && Math.abs(p.y - o.cy) < 22 + h) {
+          o.taken = true;
+          this.coins++;
+          this.sfx('orb');
+          this.fx.push({ t: 'shard', x: o.cx, y: o.cy, vx: 0, vy: 90, life: 0.5, max: 0.5, size: 6 });
         }
       } else if (o.t === 'orb') {
         const dx = p.x - o.cx;
@@ -399,6 +534,12 @@ export class Game {
     const p = this.p;
     const h = this.hazHalf;
     for (const o of this.nearby(p.x - h, p.x + h)) {
+      if (o.hidden) continue;
+      if (o.t === 'saw') {
+        const z = o.hz;
+        if (p.x + h > z.x0 && p.x - h < z.x1 && p.y + h > z.y0 && p.y - h < z.y1) { this.die(); return; }
+        continue;
+      }
       if (o.t !== 'spike') continue;
       const z = o.hz;
       if (p.x + h > z.x0 && p.x - h < z.x1 && p.y + h > z.y0 && p.y - h < z.y1) {
