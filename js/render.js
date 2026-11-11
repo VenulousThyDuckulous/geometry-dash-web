@@ -339,6 +339,111 @@ export class Renderer {
       }
       ctx.restore();
     }
+
+    // saws
+    for (const o of objs) {
+      if (o.t !== 'saw' || !this.visible(o)) continue;
+      const x = this.sx(o.cx + o.dx);
+      const y = this.sy(o.cy + o.dy);
+      const r = o.rad * this.S;
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(t * 2.4 + o.id * 0.7);
+      ctx.shadowColor = '#ff5a4d';
+      ctx.shadowBlur = 16;
+      ctx.fillStyle = 'rgba(30,8,12,0.9)';
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.fill();
+      ctx.strokeStyle = '#ff8a7a';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(0, 0, r, 0, TAU); ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * TAU;
+        const b = a + TAU / 20;
+        ctx.moveTo(Math.cos(a) * r, Math.sin(a) * r);
+        ctx.lineTo(Math.cos(b) * r * 1.18, Math.sin(b) * r * 1.18);
+      }
+      ctx.strokeStyle = theme.spike;
+      ctx.lineWidth = 1.6;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // coins
+    for (const o of objs) {
+      if (o.t !== 'coin' || o.taken || !this.visible(o)) continue;
+      const x = this.sx(o.cx + o.dx);
+      const y = this.sy(o.cy + o.dy);
+      const bob = Math.sin(t * 3 + o.id) * 2;
+      ctx.save();
+      ctx.shadowColor = '#ffd23f';
+      ctx.shadowBlur = 18;
+      ctx.fillStyle = '#ffd23f';
+      ctx.beginPath();
+      ctx.arc(x, y + bob, 9 * this.S, 0, TAU);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = '#7a5a00';
+      ctx.font = `bold ${10 * this.S}px system-ui`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('★', x, y + bob + 0.5);
+      ctx.restore();
+    }
+
+    // checkpoints
+    for (const o of objs) {
+      if (o.t !== 'checkpoint' || !this.visible(o)) continue;
+      const x = this.sx(o.x0);
+      const y = this.sy(o.y0);
+      ctx.save();
+      ctx.globalAlpha = 0.5 + Math.sin(t * 4) * 0.15;
+      ctx.strokeStyle = '#63ff9a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x, y - 60 * this.S);
+      ctx.stroke();
+      ctx.fillStyle = '#63ff9a';
+      ctx.beginPath();
+      ctx.moveTo(x, y - 60 * this.S);
+      ctx.lineTo(x + 16 * this.S, y - 52 * this.S);
+      ctx.lineTo(x, y - 44 * this.S);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // decoration
+    for (const o of objs) {
+      if (o.t !== 'deco' || !this.visible(o)) continue;
+      const x = this.sx(o.x0);
+      const y = this.sy(o.y1);
+      const w = (o.x1 - o.x0) * this.S;
+      const hh = (o.y1 - o.y0) * this.S;
+      ctx.save();
+      ctx.globalAlpha = 0.5;
+      if (o.shape === 'line') {
+        ctx.strokeStyle = theme.accent;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x, y + hh / 2);
+        ctx.lineTo(x + w, y + hh / 2);
+        ctx.stroke();
+      } else if (o.shape === 'label') {
+        ctx.fillStyle = theme.accent;
+        ctx.globalAlpha = 0.22;
+        ctx.fillRect(x + 2, y + 2, w - 4, hh - 4);
+      } else {
+        const r = Math.min(w, hh) * 0.4;
+        const g = ctx.createRadialGradient(x + w / 2, y + hh / 2, 0, x + w / 2, y + hh / 2, r);
+        g.addColorStop(0, theme.glow);
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath(); ctx.arc(x + w / 2, y + hh / 2, r, 0, TAU); ctx.fill();
+      }
+      ctx.restore();
+    }
   }
 
   drawFinish(game, theme) {
@@ -523,7 +628,7 @@ export class Renderer {
     ctx.strokeStyle = '#ff3b3b';
     for (const o of game.level.objects) {
       if (!this.visible(o)) continue;
-      if (o.t === 'spike') {
+      if (o.t === 'spike' || o.t === 'saw') {
         const z = o.hz;
         ctx.strokeRect(this.sx(z.x0), this.sy(z.y1), (z.x1 - z.x0) * this.S, (z.y1 - z.y0) * this.S);
       } else if (o.t === 'block') {
