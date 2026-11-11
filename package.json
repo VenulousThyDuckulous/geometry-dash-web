@@ -6,7 +6,7 @@
   "description": "Geometry Dash in the browser: all 8 gamemodes, GD-accurate physics at 240 TPS.",
   "scripts": {
     "serve": "python3 -m http.server 3004",
-    "check": "node --check js/main.js && node --check js/game.js && node --check js/render.js && node --check js/level.js && node --check js/audio.js && node --check js/constants.js",
+    "check": "for f in js/*.js tools/*.mjs; do node --check \"$f\" || exit 1; done",
     "validate": "node tools/validate.mjs"
   }
 }

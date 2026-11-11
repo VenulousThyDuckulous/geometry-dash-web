@@ -2,6 +2,8 @@
 
 A browser Geometry Dash clone: all **8 gamemodes**, GD-accurate physics, orbs, pads,
 portals, speed changes, mini mode, practice mode and per-level best percentages.
+Includes a **level editor** with every object and trigger, and a **level-sharing
+backend** (Firebase) with username/password accounts that never ask for an email.
 No build step, no dependencies — plain ES modules and a canvas.
 
 ## Play
@@ -108,26 +110,92 @@ arrives high out of a flight sequence.
 sections play in the normal direction — and dual mode (Hexagon Force, Blast
 Processing, Dash).*
 
+## Level editor
+
+**Level editor** on the menu opens a grid-based editor:
+
+| Action | Input |
+| --- | --- |
+| Place / paint | left click or drag |
+| Erase | right click (or the Erase tool) |
+| Select and edit properties | Select tool, then click an object |
+| Scroll | wheel |
+| Zoom | `Ctrl` + wheel, or the `−` / `+` buttons |
+| Pan | `Shift` + drag, or middle-drag |
+| Tools | `1` place, `2` erase, `3` select |
+| Undo | `Ctrl` + `Z` |
+| Delete selection | `Delete` |
+
+Every object and trigger lives in [`js/objects.js`](js/objects.js), which the
+palette, the compiler and the validator all read from:
+
+- **Terrain** — block, slab, pillar, big block, thin platform, custom width/height
+- **Hazards** — spike, small spike, ceiling spikes, small and large saws
+- **Orbs** — yellow, pink, blue, green, black, red
+- **Pads** — yellow, pink, blue, red
+- **Portals** — all 8 gamemode portals, both gravity directions, 0.5x–4x speed,
+  mini/normal size, plus mirror and dual (stored; the sim stays unmirrored and
+  single-player)
+- **Special** — secret coin, key, checkpoint, finish line, teleport
+- **Triggers** — move, rotate, scale, alpha, toggle, spawn, stop, pulse, colour,
+  each with target group and duration/offset parameters
+- **Decoration** — glow orb, pulse line, text plate
+
+Objects can be assigned to a **group**; triggers act on a group (translate, hide,
+spawn, stop), and `move` updates collision as well as the drawing. The `alpha`,
+`rotate`, `scale`, `pulse` and `colour` triggers are authored and round-tripped but
+not simulated yet.
+
+**Playtest** runs the level immediately, **Save** keeps a draft in this browser and
+**Upload** publishes it to the community list.
+
+## Accounts and uploading
+
+Accounts are **username + password, no email**. Firebase Auth has no native
+username-only sign-up, so the app derives an internal address
+`username@gdweb.local`; the player never sees it.
+
+- With a Firebase config in [`js/firebase-config.js`](js/firebase-config.js): real
+  accounts and a shared community list.
+- Without one: identical behaviour backed by `localStorage`, so the editor, sign-up
+  and upload flow work offline in a single browser.
+
+Setup steps, the Firestore data model and the security rules are in
+[`firebase/README.md`](firebase/README.md); the rules themselves live in
+[`firebase/firestore.rules`](firebase/firestore.rules). Levels are readable by
+anyone and writable only by their author.
+
 ## Project layout
 
 ```
-index.html        shell + menu/hud overlays
-styles.css        neon UI
-js/constants.js   physics constants, per-speed and per-mode tables
-js/level.js       level builder + the 22 main levels + sandbox + themes
-js/game.js        240 Hz simulation, collisions, portals, orbs, pads, checkpoints
-js/render.js      canvas renderer (all gamemode icons, portals, particles, hitboxes)
-js/audio.js       procedural soundtrack + SFX via WebAudio
-js/main.js        screens, input, fixed-timestep loop, localStorage progress
-tools/validate.mjs headless physics + fuzz checks
+index.html          shell + menu/hud/editor/account overlays
+styles.css          neon UI + editor chrome
+js/constants.js     physics constants, per-speed and per-mode tables
+js/level.js         level builder + the 22 main levels + sandbox + themes
+js/objects.js       object + trigger catalog, level compiler, fairness maths
+js/editor.js        grid editor: palette, placement, properties, undo
+js/cloud.js         accounts + level uploads (Firebase, localStorage fallback)
+js/firebase-config.js  your Firebase web config (null = local-only mode)
+js/game.js          240 Hz simulation, collisions, portals, orbs, pads, triggers
+js/render.js        canvas renderer (gamemode icons, portals, saws, coins, hitboxes)
+js/audio.js         procedural soundtrack + SFX via WebAudio
+js/main.js          screens, input, fixed-timestep loop, localStorage progress
+firebase/           Firestore rules + backend setup guide
+tools/validate.mjs  headless physics, fairness and fuzz checks
 ```
 
 ## Checks
 
 ```bash
-node tools/validate.mjs   # physics measurements, level structure, fuzz run
+node tools/validate.mjs   # physics, spike-cluster fairness, level structure, fuzz run
 npm run check             # syntax check every module
 ```
+
+The fairness check is the one that caught the playability bug: a jump only keeps
+the player above a spike for `jumpWindow()` units, so a cluster of N adjacent
+spikes is only legal if it fits with a human-sized timing margin. Three adjacent
+spikes leave 0.02 s at 1x and are **impossible** at 0.5x, so the generator caps
+clusters at two and the validator fails the build if any level regresses.
 
 ## Local server
 

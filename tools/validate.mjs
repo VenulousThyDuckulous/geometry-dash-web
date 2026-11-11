@@ -4,6 +4,7 @@
 import * as C from '../js/constants.js';
 import { LEVELS, LevelBuilder, THEMES } from '../js/level.js';
 import { Game } from '../js/game.js';
+import { clusterSlack, compileLevel } from '../js/objects.js';
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -145,6 +146,36 @@ check('orbs used', orbColors.size >= 4, [...orbColors].join(','));
 check('pads used', padColors.size >= 4, [...padColors].join(','));
 
 // ---------------------------------------------------------------------------
+// 3b. Spike clusters must be physically clearable.
+// A cluster of N adjacent spikes needs |clusterNeed| units of travel while the
+// player's body is above the hazard; the jump only provides |jumpWindow|. If
+// the slack is negative there is no input that survives, which is exactly what
+// three adjacent spikes did at 0.5x.
+// ---------------------------------------------------------------------------
+for (const lv of LEVELS) {
+  const spikes = lv.objects.filter((o) => o.t === 'spike' && typeof o.spd === 'number');
+  let worst = { n: 0, slack: Infinity, spd: 0, at: 0 };
+  let i = 0;
+  while (i < spikes.length) {
+    let n = 1;
+    let j = i;
+    while (
+      j + 1 < spikes.length &&
+      Math.abs(spikes[j + 1].x0 - spikes[j].x0 - 30) < 0.5 &&
+      spikes[j + 1].spd === spikes[i].spd
+    ) { n++; j++; }
+    const slack = clusterSlack(n, spikes[i].spd);
+    if (slack < worst.slack || n > worst.n) worst = { n: Math.max(n, worst.n), slack: Math.min(slack, worst.slack), spd: spikes[i].spd, at: spikes[i].x0 / 30 | 0 };
+    i = j + 1;
+  }
+  check(
+    `${lv.name}: spike clusters clearable`,
+    worst.slack >= 0.06 && worst.n <= 2,
+    `worst ${worst.n}x cluster @ ${C.SPEEDS[worst.spd].label} = ${worst.slack.toFixed(3)}s slack (block ${worst.at})`
+  );
+}
+
+// ---------------------------------------------------------------------------
 // 3. Fuzz run: random input through every level, no exceptions, no NaNs
 // ---------------------------------------------------------------------------
 for (const lv of LEVELS) {
@@ -169,6 +200,49 @@ for (const lv of LEVELS) {
     err = e;
   }
   check(`${lv.name}: 70s fuzz run`, !err, err ? err.message : `${deaths} deaths, reached ${(maxX / C.BLOCK) | 0} blocks`);
+}
+
+// ---------------------------------------------------------------------------
+// 5. Editor levels: every object type compiles and survives a fuzz run
+// ---------------------------------------------------------------------------
+{
+  const data = {
+    name: 'Editor smoke test', difficulty: 'Normal', theme: 'stereo', track: 'neon', length: 120,
+    objects: [
+      { t: 'block', id: 'block', x: 6, y: 0, w: 2, h: 1 },
+      { t: 'spike', id: 'spike', x: 14, y: 0, dir: 1, spd: 1 },
+      { t: 'saw', id: 'saw', x: 20, y: 0, r: 0.6 },
+      { t: 'orb', id: 'orbYellow', x: 26, y: 2, color: 'yellow' },
+      { t: 'pad', id: 'padYellow', x: 32, y: 0, color: 'yellow' },
+      { t: 'portal', id: 'pShip', x: 40, y: 0, pkind: 'mode', value: 'ship' },
+      { t: 'portal', id: 'pCube', x: 52, y: 0, pkind: 'mode', value: 'cube' },
+      { t: 'coin', id: 'coin', x: 30, y: 2 },
+      { t: 'checkpoint', id: 'checkpoint', x: 58, y: 0 },
+      { t: 'trigger', id: 'trMove', x: 60, y: 0, tt: 'move', p: { target: 2, dx: 2, dy: 1, dur: 0.5 }, grp: 2 },
+      { t: 'trigger', id: 'trToggle', x: 64, y: 0, tt: 'toggle', p: { target: 2 } },
+      { t: 'deco', id: 'decoGlow', x: 70, y: 3 },
+      { t: 'finish', id: 'finish', x: 120, y: 0 },
+    ],
+  };
+  const lv = compileLevel(data, new LevelBuilder('Editor smoke test', 'Normal', THEMES.stereo, 'neon'));
+  const counts = {};
+  for (const o of lv.objects) counts[o.t] = (counts[o.t] || 0) + 1;
+  const kinds = ['block', 'spike', 'saw', 'orb', 'pad', 'portal', 'coin', 'checkpoint', 'trigger', 'deco'];
+  check('editor level compiles every object type', kinds.every((k) => counts[k] > 0), JSON.stringify(counts));
+
+  const g = new Game(lv, false);
+  let err = null;
+  try {
+    for (let i = 0; i < 240 * 30; i++) {
+      g.tick(i % 23 < 6);
+      if (!Number.isFinite(g.p.x) || !Number.isFinite(g.p.y)) throw new Error('non-finite position');
+      if (g.p.dead && g.deadTimer > 0.5) g.restart();
+      if (g.p.won) break;
+    }
+  } catch (e) {
+    err = e;
+  }
+  check('editor level survives a 30s fuzz run', !err, err ? err.message : `reached ${(g.p.x / 30) | 0} blocks, coins ${g.coins}`);
 }
 
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
