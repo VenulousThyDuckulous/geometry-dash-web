@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Geometry Dash — Web Edition</title>
-<meta name="description" content="A browser Geometry Dash clone with all 8 gamemodes and physics matching the real game: 240 TPS, 30-unit blocks, documented jump velocities and orb strengths." />
+<meta name="description" content="A browser Geometry Dash clone with all 8 gamemodes and physics matching the real game: 240 TPS, 30-unit blocks, documented jump velocities and orb strengths. Includes a level editor and level sharing." />
 <link rel="stylesheet" href="styles.css" />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%230a0f2e'/><rect x='8' y='8' width='16' height='16' rx='3' fill='%2338e8ff'/></svg>" />
 </head>
@@ -48,6 +48,9 @@
       <footer class="menu-foot">
         <div class="foot-btns">
           <button class="btn ghost" id="practice-toggle">Practice: off</button>
+          <button class="btn ghost" id="open-editor">Level editor</button>
+          <button class="btn ghost" id="open-community">Community</button>
+          <button class="btn ghost" id="open-account">Account</button>
           <span id="best-list" class="best-list"></span>
         </div>
         <p class="keys">
@@ -83,6 +86,98 @@
         <button class="btn ghost" data-act="retry">Replay</button>
         <button class="btn ghost" data-act="menu">Level select</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Account -->
+  <div id="auth" class="screen hidden">
+    <div class="panel">
+      <h2>Account</h2>
+      <p id="auth-mode" class="auth-mode"></p>
+      <div class="auth-form" id="auth-form">
+        <label>Username<input id="auth-user" autocomplete="username" placeholder="3-24 letters or numbers" /></label>
+        <label>Password<input id="auth-pass" type="password" autocomplete="current-password" placeholder="at least 6 characters" /></label>
+        <p id="auth-msg" class="auth-msg"></p>
+        <div class="panel-btns">
+          <button class="btn primary" id="auth-signin">Sign in</button>
+          <button class="btn ghost" id="auth-signup">Create account</button>
+          <button class="btn ghost" id="auth-close">Back</button>
+        </div>
+      </div>
+      <div id="auth-current" class="hidden">
+        <p id="auth-who"></p>
+        <div class="panel-btns">
+          <button class="btn ghost" id="auth-signout">Sign out</button>
+          <button class="btn ghost" id="auth-back">Back</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Community levels -->
+  <div id="community" class="screen hidden">
+    <div class="menu-inner">
+      <header class="brand">
+        <h1>COMMUNITY<span>LEVELS</span></h1>
+        <p class="tagline">Uploaded from the editor</p>
+      </header>
+      <div class="panel-btns">
+        <button class="btn ghost" id="community-refresh">Refresh</button>
+        <button class="btn ghost" id="community-back">Back</button>
+      </div>
+      <p id="community-msg" class="auth-msg"></p>
+      <div id="community-list" class="level-grid"></div>
+    </div>
+  </div>
+
+  <!-- Editor -->
+  <div id="editor" class="screen hidden">
+    <div class="ed-wrap">
+      <div class="ed-top">
+        <button class="btn ghost" id="ed-back">Levels</button>
+        <input id="ed-name" class="ed-input" placeholder="Level name" />
+        <select id="ed-diff" class="ed-input">
+          <option>Easy</option><option>Normal</option><option>Hard</option>
+          <option selected>Harder</option><option>Insane</option><option>Demon</option>
+        </select>
+        <select id="ed-theme" class="ed-input">
+          <option value="stereo">Blue</option><option value="back">Teal</option><option value="polar">Violet</option>
+          <option value="dry">Desert</option><option value="base">Steel</option><option value="cantlet">Magenta</option>
+          <option value="jumper">Green</option><option value="time">Cyan</option><option value="cycles">Emerald</option>
+          <option value="xstep">Pink</option><option value="clutter">Indigo</option><option value="toe">Purple</option>
+          <option value="electro">Ice</option><option value="club">Clubstep</option><option value="dynamix">Neon</option>
+          <option value="hexa">Orange</option><option value="blast">Red</option><option value="toe2">Void</option>
+          <option value="geo">Tropical</option><option value="dead">Deadlocked</option><option value="finger">Fingerdash</option>
+          <option value="dash">Dash</option><option value="neon">Neon</option>
+        </select>
+        <select id="ed-track" class="ed-input">
+          <option value="neon">Track A</option><option value="shift">Track B</option><option value="hyper">Track C</option>
+        </select>
+        <button class="btn ghost" id="ed-tool-place">Place</button>
+        <button class="btn ghost" id="ed-tool-erase">Erase</button>
+        <button class="btn ghost" id="ed-tool-select">Select</button>
+        <button class="btn ghost" id="ed-undo">Undo</button>
+        <button class="btn ghost" id="ed-clear">Clear</button>
+        <button class="btn ghost" id="ed-zoom-out">−</button>
+        <button class="btn ghost" id="ed-zoom-in">+</button>
+        <button class="btn primary" id="ed-play">Playtest</button>
+        <button class="btn ghost" id="ed-save">Save</button>
+        <button class="btn ghost" id="ed-publish">Upload</button>
+      </div>
+      <div class="ed-body">
+        <aside class="ed-palette">
+          <input id="ed-search" class="ed-input" placeholder="Search objects…" />
+          <div id="ed-cats" class="ed-cats"></div>
+          <div id="ed-items" class="ed-items"></div>
+        </aside>
+        <div class="ed-stage">
+          <canvas id="ed-canvas" width="960" height="540"></canvas>
+          <div id="ed-status" class="ed-status"></div>
+        </div>
+        <aside class="ed-props" id="ed-props"></aside>
+      </div>
+      <input id="ed-group" type="number" class="hidden" min="0" max="999" value="0" />
+      <input id="ed-length" type="number" class="hidden" min="30" max="5000" value="200" />
     </div>
   </div>
 </div>
