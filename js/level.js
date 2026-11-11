@@ -1,4 +1,5 @@
 import { BLOCK, SPEEDS, GRAVITY } from './constants.js';
+import { clusterSlack } from './objects.js';
 
 // A level is authored on a 30-unit block grid. y=0 is the ground surface.
 // Everything is compiled to unit-space rects plus a per-column index so the
@@ -19,6 +20,8 @@ export class LevelBuilder {
 
   _push(obj, x0, x1) {
     obj.id = this.objects.length;
+    obj.grp = obj.grp || this.curGrp || 0;
+    obj.dx = 0; obj.dy = 0; obj.alpha = 1; obj.hidden = false;
     this.objects.push(obj);
     this.maxX = Math.max(this.maxX, x1);
     const c0 = Math.floor(x0 / BLOCK) - 1;
@@ -78,6 +81,57 @@ export class LevelBuilder {
         t: 'portal', kind, value,
         x0: x * BLOCK, y0: y * BLOCK, x1: (x + 1) * BLOCK, y1: y * BLOCK + height,
       },
+      x * BLOCK, (x + 1) * BLOCK
+    );
+  }
+
+  // Editor-only: subsequent objects join this trigger group.
+  setGroup(g) { this.curGrp = g || 0; return this; }
+
+  saw(x, y = 0, r = 0.6, meta = null) {
+    const cx = (x + 0.5) * BLOCK;
+    const cy = (y + 0.5) * BLOCK;
+    const rad = r * BLOCK;
+    const hz = { x0: cx - rad * 0.82, x1: cx + rad * 0.82, y0: cy - rad * 0.82, y1: cy + rad * 0.82 };
+    return this._push(
+      { t: 'saw', cx, cy, rad, hz, x0: cx - rad, x1: cx + rad, y0: cy - rad, y1: cy + rad, grp: meta?.grp },
+      cx - rad, cx + rad
+    );
+  }
+
+  coin(x, y, meta = null, grp = 0) {
+    const cx = (x + 0.5) * BLOCK;
+    const cy = (y + 0.5) * BLOCK;
+    return this._push(
+      { t: 'coin', cx, cy, x0: cx - 14, x1: cx + 14, y0: cy - 16, y1: cy + 16, grp: meta?.grp ?? grp, taken: false },
+      cx - 14, cx + 14
+    );
+  }
+
+  checkpoint(x, y = 0) {
+    return this._push(
+      { t: 'checkpoint', x0: x * BLOCK, y0: y * BLOCK, x1: (x + 1) * BLOCK, y1: y * BLOCK + 90 },
+      x * BLOCK, (x + 1) * BLOCK
+    );
+  }
+
+  teleport(x, y = 0, radius = 2) {
+    return this._push(
+      { t: 'teleport', radius, x0: x * BLOCK, y0: y * BLOCK, x1: (x + 1) * BLOCK, y1: y * BLOCK + 120 },
+      x * BLOCK, (x + 1) * BLOCK
+    );
+  }
+
+  trigger(x, y, tt, p = {}, grp = 0) {
+    return this._push(
+      { t: 'trigger', tt, p, grp, x0: x * BLOCK, y0: y * BLOCK, x1: (x + 1) * BLOCK, y1: y * BLOCK + 120 },
+      x * BLOCK, (x + 1) * BLOCK
+    );
+  }
+
+  deco(x, y, shape) {
+    return this._push(
+      { t: 'deco', shape, x0: x * BLOCK, y0: y * BLOCK, x1: (x + 1) * BLOCK, y1: (y + 1) * BLOCK },
       x * BLOCK, (x + 1) * BLOCK
     );
   }
@@ -152,6 +206,16 @@ function cubeRun(l, st, len) {
   const end = st.x + len;
   const inv = st.grav === -1;
   const span = jumpSpan(st.speed) * (st.mini ? 0.82 : 1);
+  // Only ask for a cluster the physics can actually deliver with a human-sized
+  // window. See objects.clusterSlack: triples are ~2 frames even at 1x and are
+  // impossible at 0.5x.
+  const doubleOk = clusterSlack(2, st.speed) >= 0.09;
+  const rawSpike = l.spike.bind(l);
+  l.spike = (sx, sy = 0, dir = 1, small = false) => {
+    rawSpike(sx, sy, dir, small);
+    l.objects[l.objects.length - 1].spd = st.speed;
+    return l;
+  };
   let x = st.x + (inv ? 14 : 4);
   let guard = 0;
 
@@ -170,10 +234,12 @@ function cubeRun(l, st, len) {
       next = x + span * 1.15;
     } else if (r < 0.47) {
       l.spike(x);
-      if (st.tier >= 3) l.spike(x + 1);
+      if (st.tier >= 3 && doubleOk) l.spike(x + 1);
       next = x + span * 1.15;
-    } else if (r < 0.58 && st.tier >= 5) {
-      l.spike(x); l.spike(x + 1); l.spike(x + 2);
+    } else if (r < 0.58 && st.tier >= 5 && doubleOk) {
+      // Never three adjacent: at 1x that leaves 0.02s of slack and at 0.5x it is
+      // mathematically impossible (see tools/validate.mjs).
+      l.spike(x); l.spike(x + 1);
       next = x + span * 1.3;
     } else if (r < 0.7) {
       const h = st.tier >= 5 ? 2 : 1;
@@ -182,10 +248,12 @@ function cubeRun(l, st, len) {
     } else if (r < 0.8 && st.tier >= 2) {
       l.orb(x, 2, st.rng() < 0.5 ? 'yellow' : 'pink');
       l.spike(x + 2);
+      l.objects[l.objects.length - 1].spd = st.speed;
       next = x + span * 1.45;
     } else if (r < 0.88 && st.tier >= 2) {
       l.pad(x, 0, st.rng() < 0.5 ? 'yellow' : 'red');
-      l.spike(x + 3); l.spike(x + 4);
+      l.spike(x + 3);
+      if (doubleOk) l.spike(x + 4);
       next = x + span * 1.6;
     } else if (st.tier >= 3) {
       // stair then drop
@@ -198,6 +266,7 @@ function cubeRun(l, st, len) {
     }
     x = next;
   }
+  l.spike = rawSpike;
   return end;
 }
 
