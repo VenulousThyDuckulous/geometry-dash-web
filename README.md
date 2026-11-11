@@ -61,14 +61,52 @@ Practice mode drops checkpoints every ~1.1s of grounded progress, like GD's prac
 
 ## Levels
 
-1. **Neon Prelude** (Easy) — cube fundamentals: spike timing, orb chain, pad launch, 2x burst.
-2. **Modal Shift** (Normal) — one section per gamemode, gentle spacing.
-3. **Hyperflux** (Hard) — 2x–4x, inverted cube run, mini section, every mode again.
-4. **Physics Lab** (Sandbox) — flat playground with pads, orbs and steps; press 1–8 to swap modes at will.
+The 22 main levels of Geometry Dash, in release order, each rebuilt with its real
+gamemode sequence, speed portals and difficulty rating:
 
-Levels are authored in [js/level.js](js/level.js) on a 30-unit grid through a small
-builder API (`spike`, `block`, `orb`, `pad`, `portal`, `finish`), so adding levels is
-just adding a function.
+| # | Level | Difficulty | Gamemodes |
+| --- | --- | --- | --- |
+| 1 | Stereo Madness | Easy | cube, ship |
+| 2 | Back On Track | Easy | cube, ship |
+| 3 | Polargeist | Normal | cube, ship |
+| 4 | Dry Out | Normal | cube (inverted) |
+| 5 | Base After Base | Hard | cube, ship |
+| 6 | Can't Let Go | Hard | cube, ship (inverted) |
+| 7 | Jumper | Harder | cube, ship (inverted) |
+| 8 | Time Machine | Harder | cube, ship |
+| 9 | Cycles | Harder | cube, ball, ship |
+| 10 | xStep | Insane | cube, ball, ship |
+| 11 | Clutterfunk | Insane | cube, ship, ball (mini) |
+| 12 | Theory of Everything | Insane | cube, ship, ball, UFO (mini) |
+| 13 | Electroman Adventures | Insane | cube, ship, ball, UFO (mini) |
+| 14 | Clubstep | Demon | cube, ship, ball, UFO (mini) |
+| 15 | Electrodynamix | Insane | cube, ship, ball, UFO (2x → 3x) |
+| 16 | Hexagon Force | Insane | cube, ship, ball, UFO (2x, mini, 0.5x finish) |
+| 17 | Blast Processing | Harder | cube, ship, ball, UFO, wave |
+| 18 | Theory of Everything 2 | Demon | cube, ship, ball, UFO, wave (mini, 2x/0.5x) |
+| 19 | Geometrical Dominator | Harder | cube, ship, ball, UFO, wave, robot |
+| 20 | Deadlocked | Demon | cube, ship, ball, UFO, wave, robot (mini, 3x/4x) |
+| 21 | Fingerdash | Insane | cube, ship, UFO, wave, robot, spider |
+| 22 | Dash | Insane | all seven plus swing (4x sections) |
+
+Plus **Physics Lab** (Sandbox) — a flat playground with pads, orbs and steps where
+`1`–`8` swap gamemodes anywhere.
+
+Each level is a list of sections in [js/level.js](js/level.js):
+
+```js
+['ship', 8, 2, 'mini'],   // mode, % of the level, speed portal index, 'mini'/'inv'
+```
+
+A per-gamemode motif library fills each section, and obstacle spacing is computed
+from the physics constants rather than hand-tuned: a cube jump covers
+`speed × 2·v/g` blocks, so gaps scale automatically when a speed portal changes.
+Portal stacks are tall gates, so a section change still lands when the player
+arrives high out of a flight sequence.
+
+*Not reproduced: mirror portals (Time Machine, Cycles, Blast Processing) — those
+sections play in the normal direction — and dual mode (Hexagon Force, Blast
+Processing, Dash).*
 
 ## Project layout
 
@@ -76,7 +114,7 @@ just adding a function.
 index.html        shell + menu/hud overlays
 styles.css        neon UI
 js/constants.js   physics constants, per-speed and per-mode tables
-js/level.js       level builder + the four levels + themes
+js/level.js       level builder + the 22 main levels + sandbox + themes
 js/game.js        240 Hz simulation, collisions, portals, orbs, pads, checkpoints
 js/render.js      canvas renderer (all gamemode icons, portals, particles, hitboxes)
 js/audio.js       procedural soundtrack + SFX via WebAudio
