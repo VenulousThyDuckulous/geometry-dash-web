@@ -1,0 +1,12 @@
+{
+  "name": "geometry-dash-web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Geometry Dash in the browser: all 8 gamemodes, GD-accurate physics at 240 TPS.",
+  "scripts": {
+    "serve": "python3 -m http.server 3004",
+    "check": "node --check js/main.js && node --check js/game.js && node --check js/render.js && node --check js/level.js && node --check js/audio.js && node --check js/constants.js",
+    "validate": "node tools/validate.mjs"
+  }
+}
