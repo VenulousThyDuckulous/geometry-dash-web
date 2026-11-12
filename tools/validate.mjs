@@ -5,6 +5,7 @@ import * as C from '../js/constants.js';
 import { LEVELS, LevelBuilder, THEMES } from '../js/level.js';
 import { Game } from '../js/game.js';
 import { clusterSlack, compileLevel } from '../js/objects.js';
+import { decodeLevelString, encodeLevelString, parseObjects, toEditorLevel } from './gddata.mjs';
 
 let failures = 0;
 function check(name, ok, detail = '') {
@@ -243,6 +244,71 @@ for (const lv of LEVELS) {
     err = e;
   }
   check('editor level survives a 30s fuzz run', !err, err ? err.message : `reached ${(g.p.x / 30) | 0} blocks, coins ${g.coins}`);
+}
+
+// ---------------------------------------------------------------------------
+// 6. Geometry Dash level import: encode -> decode -> map -> compile
+// ---------------------------------------------------------------------------
+{
+  // A hand-built GD level: 30-unit blocks on the game's absolute ground row
+  // (y = 105), with x/y as object centres.
+  const src =
+    [
+      '1,1,2,105,3,105',
+      '1,1,2,135,3,105',
+      '1,8,2,165,3,105',
+      '1,39,2,195,3,105',
+      '1,12,2,225,3,105',
+      '1,36,2,255,3,165',
+      '1,35,2,285,3,105',
+      '1,13,2,315,3,165',
+      '1,34,2,345,3,105',
+    ].join(';') + ';';
+
+  const decoded = decodeLevelString(encodeLevelString(src));
+  check('GD level string round-trips through gzip+base64', decoded === src, `${src.length} chars`);
+
+  const objects = parseObjects(decoded);
+  check(
+    'GD object parser reads id/x/y',
+    objects.length === 9 && objects[0].id === 1 && objects[1].x === 135,
+    `${objects.length} objects`
+  );
+
+  const { data } = toEditorLevel(objects, { name: 'Import test' });
+  const blocks = data.objects.filter((o) => o.t === 'block');
+  const spikes = data.objects.filter((o) => o.t === 'spike');
+  const orb = data.objects.find((o) => o.t === 'orb');
+  const portals = data.objects.filter((o) => o.t === 'portal');
+  check(
+    'import maps blocks onto the block grid with ground at y=0',
+    blocks.length === 2 && blocks[0].x === 3 && blocks[0].y === 0 && blocks[1].x === 4,
+    JSON.stringify(blocks.map((b) => [b.x, b.y]))
+  );
+  check(
+    'import keeps spike size and direction',
+    spikes.length === 2 && spikes[0].small === false && spikes[1].small === true && spikes.every((s) => s.dir === 1 && s.y === 0)
+  );
+  check('import keeps heights above the ground', orb && orb.y === 2 && orb.color === 'yellow', orb ? `orb y=${orb.y} (two rows above the ground row)` : 'no orb');
+  check(
+    'import maps gamemode portals',
+    portals.length === 2 && portals.some((p) => p.value === 'cube') && portals.some((p) => p.value === 'ship')
+  );
+  check('import places the finish at the end object', data.objects.some((o) => o.t === 'finish' && o.x === 11));
+
+  const lv = compileLevel(data, new LevelBuilder('Import test', 'Normal', THEMES.stereo, 'neon'));
+  const g = new Game(lv, false);
+  let err = null;
+  try {
+    for (let i = 0; i < 240 * 8; i++) {
+      g.tick(i % 31 < 8);
+      if (!Number.isFinite(g.p.x) || !Number.isFinite(g.p.y)) throw new Error('non-finite position');
+      if (g.p.dead && g.deadTimer > 0.5) g.restart();
+    }
+  } catch (e) {
+    err = e;
+  }
+  check('imported level compiles and runs', !err, err ? err.message : `${lv.objects.length} objects, ${(lv.length / 30) | 0} blocks`);
 }
 
 console.log(failures === 0 ? '\nAll checks passed.' : `\n${failures} check(s) failed.`);
