@@ -1,5 +1,6 @@
 import { BLOCK, SPEEDS, GRAVITY } from './constants.js';
-import { clusterSlack } from './objects.js';
+import { clusterSlack, compileLevel } from './objects.js';
+import { OFFICIAL_LEVELS } from './official-levels.js';
 
 // A level is authored on a 30-unit block grid. y=0 is the ground surface.
 // Everything is compiled to unit-space rects plus a per-column index so the
@@ -630,4 +631,19 @@ function physicsLab() {
   return l.done();
 }
 
-export const LEVELS = [...MAIN.map(build), physicsLab()];
+// Imported exact copies (tools/gdimport.mjs) replace the generated level with
+// the same name; with no import file the generated levels are used as-is.
+function buildImported(rec) {
+  const l = new LevelBuilder(rec.name, rec.difficulty, THEMES[rec.theme] || THEMES.stereo, rec.track || 'neon');
+  return compileLevel(rec.data, l);
+}
+
+const IMPORTED = new Map(OFFICIAL_LEVELS.map((r) => [String(r.name).toLowerCase(), r]));
+
+export const LEVELS = [
+  ...MAIN.map((cfg) => {
+    const rec = IMPORTED.get(cfg.name.toLowerCase());
+    return rec ? buildImported(rec) : build(cfg);
+  }),
+  physicsLab(),
+];
