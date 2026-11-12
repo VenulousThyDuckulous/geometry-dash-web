@@ -176,12 +176,14 @@ js/objects.js       object + trigger catalog, level compiler, fairness maths
 js/editor.js        grid editor: palette, placement, properties, undo
 js/cloud.js         accounts + level uploads (Firebase, localStorage fallback)
 js/firebase-config.js  your Firebase web config (null = local-only mode)
+js/official-levels.js  exact copies imported from level data (empty by default)
 js/game.js          240 Hz simulation, collisions, portals, orbs, pads, triggers
 js/render.js        canvas renderer (gamemode icons, portals, saws, coins, hitboxes)
 js/audio.js         procedural soundtrack + SFX via WebAudio
 js/main.js          screens, input, fixed-timestep loop, localStorage progress
 firebase/           Firestore rules + backend setup guide
 tools/validate.mjs  headless physics, fairness and fuzz checks
+tools/gdimport.mjs  imports exact levels from Geometry Dash level data
 ```
 
 ## Checks
@@ -196,6 +198,33 @@ the player above a spike for `jumpWindow()` units, so a cluster of N adjacent
 spikes is only legal if it fits with a human-sized timing margin. Three adjacent
 spikes leave 0.02 s at 1x and are **impossible** at 0.5x, so the generator caps
 clusters at two and the validator fails the build if any level regresses.
+
+## Exact official levels
+
+The 22 levels in [js/level.js](js/level.js) are rebuilt from the real gamemode
+sequences, speeds and difficulties, but they are reconstructions built from the
+section list. To play the **exact** layouts, import the level data that ships
+with the game:
+
+1. Copy `Resources/LevelData.plist` out of your Geometry Dash install (Steam:
+   `steamapps/common/Geometry Dash/Resources/`), or export a level as `.gmd`.
+2. Put it anywhere in the project, e.g. `levels/gd/LevelData.plist`.
+3. Import it:
+
+```bash
+node tools/gdimport.mjs levels/gd/LevelData.plist
+```
+
+The importer decodes the base64 + zlib level strings, maps the gameplay objects
+(blocks, spikes, orbs, pads, gamemode/gravity/speed portals, end wall) onto the
+block grid, shifts the ground to `y = 0` and writes `js/official-levels.js`.
+Each imported level replaces the generated level with the same name and keeps
+its difficulty and palette; decoration is skipped. Re-run it any time to refresh.
+
+The official level data belongs to RobTop, so it is not in this repository —
+`js/official-levels.js` ships empty and the game falls back to the generated
+levels. `node tools/validate.mjs` round-trips a level string through the
+importer on every run, so the decoding path stays tested.
 
 ## Local server
 

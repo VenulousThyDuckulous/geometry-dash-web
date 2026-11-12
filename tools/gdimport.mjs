@@ -83,7 +83,7 @@ for (const file of files) {
     const meta = META.get(entry.name.toLowerCase());
     let theme = 'stereo';
     let difficulty = meta ? meta.difficulty : 'Insane';
-    const track = meta ? meta.track : 'neon';
+    let track = meta ? meta.track : 'neon';
     if (meta) {
       const key = Object.keys(THEMES).find((k) => THEMES[k] === meta.theme);
       if (key) theme = key;
