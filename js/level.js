@@ -635,7 +635,11 @@ function physicsLab() {
 // the same name; with no import file the generated levels are used as-is.
 function buildImported(rec) {
   const l = new LevelBuilder(rec.name, rec.difficulty, THEMES[rec.theme] || THEMES.stereo, rec.track || 'neon');
-  return compileLevel(rec.data, l);
+  const lv = compileLevel(rec.data, l);
+  // Authored by the game, not by our generator: the validator reports the
+  // spacing/section invariants for these instead of failing on them.
+  lv.imported = true;
+  return lv;
 }
 
 const IMPORTED = new Map(OFFICIAL_LEVELS.map((r) => [String(r.name).toLowerCase(), r]));
